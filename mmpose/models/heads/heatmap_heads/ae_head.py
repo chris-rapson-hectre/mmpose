@@ -321,9 +321,14 @@ class AssociativeEmbeddingHead(HeatmapHead):
             [d.gt_fields.heatmaps for d in batch_data_samples])
         gt_masks = torch.stack(
             [d.gt_fields.heatmap_mask for d in batch_data_samples])
-        keypoint_weights = torch.cat([
-            d.gt_instance_labels.keypoint_weights for d in batch_data_samples
-        ])
+        # Aggregate per-instance keypoint_weights (N_i, K) to per-image (K,)
+        # using max across instances, since the heatmap loss is per-image.
+        keypoint_weights = torch.stack([
+            d.gt_instance_labels.keypoint_weights.amax(dim=0)
+            if d.gt_instance_labels.keypoint_weights.numel() > 0
+            else torch.ones(self.num_keypoints, device=feats[0].device)
+            for d in batch_data_samples
+        ], dim=0)  # (batch, num_keypoints)
         keypoint_indices = [
             d.gt_instance_labels.keypoint_indices for d in batch_data_samples
         ]
