@@ -9,13 +9,15 @@ from .common_transforms import (Albumentation, FilterAnnotations,
 from .converting import KeypointConverter, SingleHandConverter
 from .formatting import PackPoseInputs
 from .hand_transforms import HandRandomFlip
+from .visualise_augmented_images import DebugVisualizeAugmented, DebugAugmentedSetupHook
 from .loading import LoadImage
 from .mix_img_transforms import Mosaic, YOLOXMixUp
 from .pose3d_transforms import RandomFlipAroundRoot
 from .topdown_transforms import TopdownAffine
 
 __all__ = [
-    'GetBBoxCenterScale', 'RandomBBoxTransform', 'RandomFlip', 'RandomFlipBidirectional', 'RandomRot90',
+    'GetBBoxCenterScale', 'RandomBBoxTransform', 'RandomFlip',
+    'RandomFlipBidirectional', 'RandomRot90', 'DebugVisualizeAugmented', 'DebugAugmentedSetupHook',
     'RandomHalfBody', 'TopdownAffine', 'Albumentation',
     'PhotometricDistortion', 'PackPoseInputs', 'LoadImage',
     'BottomupGetHeatmapMask', 'BottomupRandomAffine', 'BottomupResize',
