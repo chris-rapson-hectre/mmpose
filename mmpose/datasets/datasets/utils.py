@@ -131,6 +131,7 @@ def parse_pose_metainfo(metainfo: dict):
         flip_pairs=[],
         flip_ud_indices=[],
         flip_ud_pairs=[],
+        rot90_indices=[],
         keypoint_colors=[],
         num_skeleton_links=None,
         skeleton_links=[],
@@ -174,6 +175,12 @@ def parse_pose_metainfo(metainfo: dict):
             if pair not in parsed['flip_ud_pairs']:
                 parsed['flip_ud_pairs'].append(pair)
 
+        rot90_kpt = kpt.get('rot90', '')
+        if rot90_kpt == kpt_name or rot90_kpt == '':
+            parsed['rot90_indices'].append(kpt_name)
+        else:
+            parsed['rot90_indices'].append(rot90_kpt)
+
     # parse skeleton information
     parsed['num_skeleton_links'] = len(metainfo['skeleton_info'])
     for _, sk in metainfo['skeleton_info'].items():
@@ -208,6 +215,8 @@ def parse_pose_metainfo(metainfo: dict):
         parsed['flip_ud_indices'], mapping=parsed['keypoint_name2id'])
     parsed['skeleton_links'] = _map(
         parsed['skeleton_links'], mapping=parsed['keypoint_name2id'])
+    parsed['rot90_indices'] = _map(
+        parsed['rot90_indices'], mapping=parsed['keypoint_name2id'])
 
     parsed['keypoint_colors'] = np.array(
         parsed['keypoint_colors'], dtype=np.uint8)

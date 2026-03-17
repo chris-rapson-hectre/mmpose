@@ -1317,3 +1317,134 @@ class RandomFlipBidirectional(BaseTransform):
                 results['flip'] = True
                 results['flip_direction'].append(direction)
         return results
+
+
+@TRANSFORMS.register_module()
+class RandomRot90(BaseTransform):
+    """Randomly rotate image, bboxes, and keypoints by 90° increments.
+
+    Rotation is counter-clockwise (consistent with np.rot90).
+    Keypoint indices are swapped using ``rot90_indices`` from dataset metainfo,
+    applied N times for an N×90° rotation.
+
+    Required Keys:
+
+        - img
+        - img_shape
+        - rot90_indices
+        - keypoints (optional)
+        - keypoints_visible (optional)
+        - bbox (optional)
+        - bbox_center (optional)
+
+    Modified Keys:
+
+        - img
+        - img_shape
+        - keypoints (optional)
+        - keypoints_visible (optional)
+        - bbox (optional)
+        - bbox_center (optional)
+
+    Args:
+        prob (float): Probability that any rotation (k>0) is applied.
+            When triggered, k is chosen uniformly from {1, 2, 3}.
+            Defaults to 0.75.
+    """
+
+    def __init__(self, prob: float = 0.75) -> None:
+        super().__init__()
+        assert 0 <= prob <= 1
+        self.prob = prob
+
+    @cache_randomness
+    def _get_rot_k(self) -> int:
+        if np.random.rand() < self.prob:
+            return np.random.choice([1, 2, 3])
+        return 0
+
+    def transform(self, results: dict) -> dict:
+        k = self._get_rot_k()
+        if k == 0:
+            return results
+
+        h, w = results['img_shape'][:2]
+
+        # --- rotate image ---
+        results['img'] = np.ascontiguousarray(np.rot90(results['img'], k=k))
+        if k % 2 == 1:
+            results['img_shape'] = (w, h)
+        # else shape unchanged
+
+        # --- rotate keypoints ---
+        if results.get('keypoints', None) is not None:
+            kpts = results['keypoints'].copy()
+
+            # Coordinate transform (CCW rotation by k*90°)
+            #   k=1: (x, y) -> (y,     W-1-x)   new dims: (W, H)
+            #   k=2: (x, y) -> (W-1-x, H-1-y)   same dims: (H, W)
+            #   k=3: (x, y) -> (H-1-y, x)        new dims: (W, H)
+            x, y = kpts[..., 0].copy(), kpts[..., 1].copy()
+            if k == 1:
+                kpts[..., 0] = y
+                kpts[..., 1] = w - 1 - x
+            elif k == 2:
+                kpts[..., 0] = w - 1 - x
+                kpts[..., 1] = h - 1 - y
+            elif k == 3:
+                kpts[..., 0] = h - 1 - y
+                kpts[..., 1] = x
+
+            # Swap keypoint identities by composing rot90_indices k times
+            rot90_indices = results['rot90_indices']
+            composed = list(range(kpts.shape[-2]))
+            for _ in range(k):
+                composed = [rot90_indices[i] for i in composed]
+
+            kpts = kpts[..., composed, :]
+            results['keypoints'] = kpts
+
+            if results.get('keypoints_visible', None) is not None:
+                results['keypoints_visible'] = \
+                    results['keypoints_visible'][..., composed]
+
+        # --- rotate bboxes (xyxy format) ---
+        if results.get('bbox', None) is not None:
+            bboxes = results['bbox'].copy()  # (N, 4) as x1,y1,x2,y2
+            x1, y1 = bboxes[..., 0].copy(), bboxes[..., 1].copy()
+            x2, y2 = bboxes[..., 2].copy(), bboxes[..., 3].copy()
+            if k == 1:
+                bboxes[..., 0] = y1
+                bboxes[..., 1] = w - 1 - x2
+                bboxes[..., 2] = y2
+                bboxes[..., 3] = w - 1 - x1
+            elif k == 2:
+                bboxes[..., 0] = w - 1 - x2
+                bboxes[..., 1] = h - 1 - y2
+                bboxes[..., 2] = w - 1 - x1
+                bboxes[..., 3] = h - 1 - y1
+            elif k == 3:
+                bboxes[..., 0] = h - 1 - y2
+                bboxes[..., 1] = x1
+                bboxes[..., 2] = h - 1 - y1
+                bboxes[..., 3] = x2
+            results['bbox'] = bboxes
+
+        if results.get('bbox_center', None) is not None:
+            center = results['bbox_center'].copy()  # (N, 2)
+            cx, cy = center[..., 0].copy(), center[..., 1].copy()
+            if k == 1:
+                center[..., 0] = cy
+                center[..., 1] = w - 1 - cx
+            elif k == 2:
+                center[..., 0] = w - 1 - cx
+                center[..., 1] = h - 1 - cy
+            elif k == 3:
+                center[..., 0] = h - 1 - cy
+                center[..., 1] = cx
+            results['bbox_center'] = center
+
+        return results
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}(prob={self.prob})'
