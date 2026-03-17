@@ -112,7 +112,10 @@ class BottomupGetHeatmapMask(BaseTransform):
         # Flip the mask if the image has been flipped
         if results.get('flip', False):
             flip_dir = results['flip_direction']
-            if flip_dir is not None:
+            if isinstance(flip_dir, list):
+                for f in flip_dir:
+                    mask = imflip_(mask, f)
+            elif flip_dir is not None:
                 mask = imflip_(mask, flip_dir)
 
         # Resize the mask to the same size of heatmaps

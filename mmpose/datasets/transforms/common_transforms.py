@@ -7,6 +7,7 @@ import cv2
 import mmcv
 import mmengine
 import numpy as np
+from mmcv import BaseTransform, imflip
 from mmcv.image import imflip
 from mmcv.transforms import BaseTransform
 from mmcv.transforms.utils import avoid_cache_randomness, cache_randomness
@@ -16,6 +17,7 @@ from scipy.stats import truncnorm
 
 from mmpose.codecs import *  # noqa: F401, F403
 from mmpose.registry import KEYPOINT_CODECS, TRANSFORMS
+from mmpose.structures import flip_bbox, flip_keypoints
 from mmpose.structures.bbox import bbox_xyxy2cs, flip_bbox
 from mmpose.structures.keypoint import flip_keypoints
 from mmpose.utils.typing import MultiConfig
@@ -1256,3 +1258,62 @@ class FilterAnnotations(BaseTransform):
                 f'by_area={self.by_area}, '
                 f'by_kpt={self.by_kpt}, '
                 f'keep_empty={self.keep_empty})')
+
+
+@TRANSFORMS.register_module()
+class RandomFlipBidirectional(BaseTransform):
+    """Randomly flip image, bbox and keypoints with direction-specific
+    swap indices.
+
+    Args:
+        prob (float): Probability of each flip being applied independently.
+        directions (list[str]): Flip directions, e.g. ['horizontal', 'vertical'].
+        flip_indices_map (dict): Mapping from direction to the key in results
+            that holds the swap indices. E.g.:
+            {'horizontal': 'flip_indices', 'vertical': 'flip_ud_indices'}
+    """
+
+    def __init__(self, prob=0.5,
+                 directions=('horizontal', 'vertical'),
+                 flip_indices_map=None):
+        self.prob = prob
+        self.directions = directions
+        self.flip_indices_map = flip_indices_map or {
+            'horizontal': 'flip_indices',
+            'vertical': 'flip_ud_indices',
+        }
+
+    def transform(self, results: dict) -> dict:
+        results['flip_direction'] = []
+        for direction in self.directions:
+            if np.random.rand() < self.prob:
+                h, w = results.get('input_size', results['img_shape'])
+
+                # Flip image
+                results['img'] = imflip(results['img'], direction=direction)
+
+                # Flip bboxes
+                if results.get('bbox', None) is not None:
+                    results['bbox'] = flip_bbox(
+                        results['bbox'], image_size=(w, h),
+                        bbox_format='xyxy', direction=direction)
+                if results.get('bbox_center', None) is not None:
+                    results['bbox_center'] = flip_bbox(
+                        results['bbox_center'], image_size=(w, h),
+                        bbox_format='center', direction=direction)
+
+                # Flip keypoints with direction-specific indices
+                if results.get('keypoints', None) is not None:
+                    idx_key = self.flip_indices_map[direction]
+                    keypoints, keypoints_visible = flip_keypoints(
+                        results['keypoints'],
+                        results.get('keypoints_visible', None),
+                        image_size=(w, h),
+                        flip_indices=results[idx_key],
+                        direction=direction)
+                    results['keypoints'] = keypoints
+                    results['keypoints_visible'] = keypoints_visible
+
+                results['flip'] = True
+                results['flip_direction'].append(direction)
+        return results
