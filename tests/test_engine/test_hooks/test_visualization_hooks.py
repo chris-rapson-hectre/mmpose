@@ -1,12 +1,18 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import os
 import os.path as osp
 import shutil
+import tempfile
 import time
+from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import MagicMock
 
 import numpy as np
 from mmengine.structures import InstanceData
+
+from mmpose.datasets import DebugVisualizeAugmented
+from mmpose.engine import DebugAugmentedSetupHook
 
 from mmpose.engine.hooks import PoseVisualizationHook
 from mmpose.structures import PoseDataSample
@@ -71,3 +77,54 @@ class TestVisualizationHook(TestCase):
         hook.after_test_iter(runner, 1, self.data_batch, self.outputs)
         self.assertTrue(osp.exists(f'{timestamp}/1/{out_dir}'))
         shutil.rmtree(f'{timestamp}')
+
+
+class TestDebugAugmentedSetupHook(TestCase):
+
+    def setUp(self):
+        self._old_env_value = os.environ.get("MMPOSE_DEBUG_AUG_DIR")
+
+    def tearDown(self):
+        if self._old_env_value is None:
+            os.environ.pop("MMPOSE_DEBUG_AUG_DIR", None)
+        else:
+            os.environ["MMPOSE_DEBUG_AUG_DIR"] = self._old_env_value
+
+    def test_before_run_sets_env_and_updates_transform(self):
+        """Verify env var and transform output dir are set correctly."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            hook = DebugAugmentedSetupHook()
+            transform = DebugVisualizeAugmented(out_dir="old-path")
+            transform._resolved_out_dir = "already-resolved"
+            pipeline = SimpleNamespace(transforms=[transform])
+
+            runner = SimpleNamespace(
+                work_dir=temp_dir,
+                timestamp="20260330_120000",
+                train_dataloader=SimpleNamespace(
+                    dataset=SimpleNamespace(pipeline=pipeline)
+                ),
+            )
+
+            hook.before_run(runner)
+
+            expected_dir = os.path.join(temp_dir, runner.timestamp, "debug_augmented")
+            assert os.environ.get("MMPOSE_DEBUG_AUG_DIR") == expected_dir
+            assert transform._configured_out_dir == expected_dir
+            assert transform._resolved_out_dir == None
+            assert os.path.isdir(expected_dir)
+
+    def test_before_run_sets_env_even_without_pipeline(self):
+        """Verify env var is set even when pipeline attribute is unavailable."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            hook = DebugAugmentedSetupHook()
+            runner = SimpleNamespace(
+                work_dir=temp_dir,
+                timestamp="20260330_120000",
+                train_dataloader=SimpleNamespace(dataset=SimpleNamespace()),
+            )
+
+            hook.before_run(runner)
+
+            expected_dir = os.path.join(temp_dir, runner.timestamp, "debug_augmented")
+            assert os.environ.get("MMPOSE_DEBUG_AUG_DIR") == expected_dir
