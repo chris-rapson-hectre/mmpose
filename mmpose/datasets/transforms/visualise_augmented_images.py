@@ -20,7 +20,8 @@ class DebugVisualizeAugmented(BaseTransform):
             MMPOSE_DEBUG_AUG_DIR environment variable set by
             DebugAugmentedSetupHook. Falls back to 'debug_augmented' in the
             current working directory if neither is set.
-        max_samples (int): Stop saving after this many images (-1 = unlimited).
+        max_samples (int): Stop saving after this many images per dataloader worker (-1 = unlimited).
+            Total images on disk may be up to max_samples x num_workers.
             Defaults to 200.
         kpt_radius (int): Radius of keypoint circles. Defaults to 4.
         link_thickness (int): Thickness of skeleton lines. Defaults to 2.
@@ -98,7 +99,7 @@ class DebugVisualizeAugmented(BaseTransform):
 
         img_path = results.get('img_path', '')
         basename = os.path.splitext(os.path.basename(img_path))[0]
-        fname = f'{DebugVisualizeAugmented._counter:06d}_{basename}.jpg'
+        fname = f'{DebugVisualizeAugmented._counter:06d}_{basename}_{os.getpid()}.jpg'
         cv2.imwrite(os.path.join(out_dir, fname),
                     cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
         DebugVisualizeAugmented._counter += 1
