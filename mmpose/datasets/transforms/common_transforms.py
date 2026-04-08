@@ -1415,8 +1415,11 @@ class RandomRot90(BaseTransform):
             results['keypoints'] = kpts
 
             if results.get('keypoints_visible', None) is not None:
-                results['keypoints_visible'] = \
-                    results['keypoints_visible'][..., composed]
+                vis = results['keypoints_visible']
+                if vis.ndim == 2:
+                    results['keypoints_visible'] = vis[..., composed]
+                else:
+                    results['keypoints_visible'] = vis[..., composed, :]
 
         # --- rotate bboxes (xyxy format) ---
         if results.get('bbox', None) is not None:

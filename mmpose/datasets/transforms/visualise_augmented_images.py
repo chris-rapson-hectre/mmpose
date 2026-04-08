@@ -67,7 +67,9 @@ class DebugVisualizeAugmented(BaseTransform):
         keypoints_visible = results.get('keypoints_visible', None)
         skeleton_links = results.get('skeleton_links', None)
 
-        if keypoints is not None:
+        if keypoints is not None and keypoints_visible is not None:
+            if keypoints_visible.ndim == 3:
+                keypoints_visible = keypoints_visible[..., 0]
             for kpts, vis in zip(keypoints, keypoints_visible):
                 if skeleton_links is not None:
                     for link in skeleton_links:
