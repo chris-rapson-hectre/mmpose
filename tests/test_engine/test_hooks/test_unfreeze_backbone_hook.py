@@ -35,6 +35,9 @@ class TestUnfreezeBackboneHook(TestCase):
         model = SimpleNamespace(backbone=DummyBackbone())
         runner = SimpleNamespace(model=model, logger=Mock())
 
+        # confirm that model is not frozen until `before_run` is called
+        assert model.backbone.frozen_stages == -1
+
         hook.before_run(runner)
 
         assert model.backbone.frozen_stages == 4
@@ -70,6 +73,9 @@ class TestUnfreezeBackboneHook(TestCase):
         model = SimpleNamespace(backbone=DummyBackbone())
         runner = SimpleNamespace(model=model, logger=Mock(), epoch=2)
 
+        hook.before_run(runner)
         hook.before_train_epoch(runner)
 
+        assert model.backbone.frozen_stages == 4
+        assert all(not parameter.requires_grad for parameter in model.backbone.parameters())
         assert model.backbone.train_called == 0
