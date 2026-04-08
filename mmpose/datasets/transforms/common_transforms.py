@@ -1276,12 +1276,21 @@ class RandomFlipBidirectional(BaseTransform):
     def __init__(self, prob=0.5,
                  directions=('horizontal', 'vertical'),
                  flip_indices_map=None):
+        if not 0 <= prob <= 1:
+            raise ValueError(f'prob must be in [0, 1], got {prob}')
+        if not is_list_of(list(directions), str):
+            raise TypeError('directions must be a sequence of strings')
+
         self.prob = prob
         self.directions = directions
         self.flip_indices_map = flip_indices_map or {
             'horizontal': 'flip_indices',
             'vertical': 'flip_ud_indices',
         }
+        unsupported = set(self.directions) - set(self.flip_indices_map)
+        if unsupported:
+            raise ValueError(
+                f'No flip index mapping configured for {sorted(unsupported)}')
 
     def transform(self, results: dict) -> dict:
         results['flip_direction'] = []
