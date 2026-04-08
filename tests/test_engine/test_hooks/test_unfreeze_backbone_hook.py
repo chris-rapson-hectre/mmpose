@@ -43,7 +43,7 @@ class TestUnfreezeBackboneHook(TestCase):
         assert model.backbone.frozen_stages == 4
         assert model.backbone.freeze_called == 1
         assert all(
-            parameter.requires_grad == False
+            not parameter.requires_grad
             for parameter in model.backbone.parameters()
         )
 
@@ -62,7 +62,7 @@ class TestUnfreezeBackboneHook(TestCase):
         assert wrapped_model.backbone.frozen_stages == -1
         assert wrapped_model.backbone.train_called == 1
         assert all(
-            parameter.requires_grad == True
+            parameter.requires_grad
             for parameter in wrapped_model.backbone.parameters()
         )
 
