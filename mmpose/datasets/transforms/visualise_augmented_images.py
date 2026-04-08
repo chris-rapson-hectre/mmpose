@@ -71,7 +71,11 @@ class DebugVisualizeAugmented(BaseTransform):
         if keypoints is not None and keypoints_visible is not None:
             if keypoints_visible.ndim == 3:
                 keypoints_visible = keypoints_visible[..., 0]
+            if len(keypoints) != len(keypoints_visible):
+                raise ValueError('keypoints and keypoints_visible must have same number of instances')
             for kpts, vis in zip(keypoints, keypoints_visible):
+                if len(kpts) != len(vis):
+                    raise ValueError('each instance of keypoints and keypoints_visible must have same number of points')
                 if skeleton_links is not None:
                     for link in skeleton_links:
                         k1, k2 = link
