@@ -1390,7 +1390,17 @@ class RandomRot90(BaseTransform):
         h, w = results['img_shape'][:2]
 
         # --- rotate image ---
-        results['img'] = np.ascontiguousarray(np.rot90(results['img'], k=k))
+        
+        if isinstance(results['img'], list):
+            results['img'] = [np.ascontiguousarray(np.rot90(img, k=k)) for img in results['img']]
+        else:
+            results['img'] = np.ascontiguousarray(np.rot90(results['img'], k=k))
+        
+        if 'img_mask' in results:
+            if isinstance(results['img_mask'], list):
+                results['img_mask'] = [np.ascontiguousarray(np.rot90(mask, k=k)) for mask in results['img_mask']]
+        else:
+            results['img_mask'] = np.ascontiguousarray(np.rot90(results['img_mask'], k=k))
         if k % 2 == 1:
             results['img_shape'] = (w, h)
         # else shape unchanged
