@@ -187,8 +187,7 @@ class DebugAugmentedSetupHook(Hook):
     priority = 'VERY_HIGH'
 
     def before_run(self, runner) -> None:
-        out_dir = os.path.join(
-            runner.work_dir, runner.timestamp, 'debug_augmented')
+        out_dir = os.path.join(runner.work_dir, runner.timestamp, 'debug_augmented')
 
         # 1. Env var: inherited by worker processes spawned later
         os.environ['MMPOSE_DEBUG_AUG_DIR'] = out_dir
@@ -202,5 +201,9 @@ class DebugAugmentedSetupHook(Hook):
                     transform._resolved_out_dir = None  # force re-resolution
                     os.makedirs(out_dir, exist_ok=True)
                     break
-        except Exception:
-            pass  # dataloader may not have a .pipeline in all configurations
+        except AttributeError:
+            # dataloader may not have a .pipeline in all configurations
+            runner.logger.debug(
+                'Could not access train pipeline transform configuration. '
+                'Rely on env var to set out_dir for the DebugVisualizeAugmented transform.'
+            )
