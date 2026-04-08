@@ -1454,6 +1454,10 @@ class RandomRot90(BaseTransform):
                 center[..., 1] = cx
             results['bbox_center'] = center
 
+        if k % 2 == 1 and results.get('bbox_scale', None) is not None:
+            # swap w and h if rotated by 90 or 270 degrees
+            results['bbox_scale'] = results['bbox_scale'][..., [1, 0]]
+
         return results
 
     def __repr__(self) -> str:
