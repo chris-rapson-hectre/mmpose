@@ -171,7 +171,7 @@ def parse_pose_metainfo(metainfo: dict):
             parsed['flip_ud_indices'].append(kpt_name)
         else:
             parsed['flip_ud_indices'].append(swap_ud_kpt)
-            pair = (swap_kpt, kpt_name)
+            pair = (swap_ud_kpt, kpt_name)
             if pair not in parsed['flip_ud_pairs']:
                 parsed['flip_ud_pairs'].append(pair)
 
