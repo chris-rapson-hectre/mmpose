@@ -1285,6 +1285,7 @@ class RandomFlipBidirectional(BaseTransform):
 
     def transform(self, results: dict) -> dict:
         results['flip_direction'] = []
+        results['flip'] = False
         for direction in self.directions:
             if np.random.rand() < self.prob:
                 h, w = results.get('input_size', results['img_shape'])
