@@ -11,19 +11,24 @@ class UnfreezeBackboneHook(Hook):
         self.backbone_stages = backbone_stages
 
     def before_run(self, runner: Runner):
-        # Firstly, freeze the backbone, then unfreeze later
         model = runner.model
         if hasattr(model, 'module'):
             model = model.module
-        model.backbone.frozen_stages = self.backbone_stages
-        model.backbone._freeze_stages()
-        runner.logger.info('Backbone frozen for initial training phase')
+        if runner.epoch >= self.unfreeze_epoch:
+            for param in model.backbone.parameters():
+                param.requires_grad = True
+            model.backbone.frozen_stages = -1
+            model.backbone.train()
+        else:
+            model.backbone.frozen_stages = self.backbone_stages
+            model.backbone._freeze_stages()
+            runner.logger.info('Backbone frozen for initial training phase')
 
     def before_train_epoch(self, runner: Runner):
         # Check if we reached the target epoch
-        if runner.epoch == self.unfreeze_epoch:
+        model = runner.model
+        if runner.epoch >= self.unfreeze_epoch and model.backbone.frozen_stages != -1:
             runner.logger.info(f'Unfreezing backbone at epoch {runner.epoch}')
-            model = runner.model
             if hasattr(model, 'module'):  # Handle DistributedDataParallel wrapper
                 model = model.module
 
