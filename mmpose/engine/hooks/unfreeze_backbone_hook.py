@@ -1,23 +1,25 @@
 from mmengine.hooks import Hook
+from mmengine.runner import Runner
 
 from mmpose.registry import HOOKS
 
 
 @HOOKS.register_module()
 class UnfreezeBackboneHook(Hook):
-    def __init__(self, unfreeze_epoch):
+    def __init__(self, unfreeze_epoch, backbone_stages: int = 4):
         self.unfreeze_epoch = unfreeze_epoch
+        self.backbone_stages = backbone_stages
 
-    def before_run(self, runner):
+    def before_run(self, runner: Runner):
         # Firstly, freeze the backbone, then unfreeze later
         model = runner.model
         if hasattr(model, 'module'):
             model = model.module
-        model.backbone.frozen_stages = 4
+        model.backbone.frozen_stages = self.backbone_stages
         model.backbone._freeze_stages()
         runner.logger.info('Backbone frozen for initial training phase')
 
-    def before_train_epoch(self, runner):
+    def before_train_epoch(self, runner: Runner):
         # Check if we reached the target epoch
         if runner.epoch == self.unfreeze_epoch:
             runner.logger.info(f'Unfreezing backbone at epoch {runner.epoch}')
