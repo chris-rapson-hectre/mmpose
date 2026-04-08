@@ -1,4 +1,7 @@
+from typing import Optional
+
 from mmengine.hooks import Hook
+from mmengine.runner import Runner
 
 from mmpose.registry import HOOKS
 
@@ -61,7 +64,7 @@ class EarlyStoppingHook(Hook):
             return current > self.best_score + self.min_delta
         return current < self.best_score - self.min_delta
 
-    def after_val_epoch(self, runner, metrics: dict = None) -> None:
+    def after_val_epoch(self, runner: Runner, metrics: Optional[dict] = None) -> None:
         if not metrics:
             return
 
@@ -109,7 +112,7 @@ class EarlyStoppingHook(Hook):
                 self._stop(runner)
 
     @staticmethod
-    def _stop(runner) -> None:
+    def _stop(runner: Runner) -> None:
         """Signal the EpochBasedTrainLoop to break after the current epoch."""
         if hasattr(runner.train_loop, 'stop_training'):
             # Preferred: MMEngine sets this flag at the end of each epoch
