@@ -1435,7 +1435,7 @@ class RandomRot90(BaseTransform):
 
             if results.get('keypoints_visible', None) is not None:
                 vis = results['keypoints_visible']
-                if vis.ndim == 2:
+                if vis.ndim == kpts.ndim - 1:
                     results['keypoints_visible'] = vis[..., composed]
                 else:
                     results['keypoints_visible'] = vis[..., composed, :]
