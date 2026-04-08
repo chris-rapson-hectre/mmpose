@@ -1291,7 +1291,16 @@ class RandomFlipBidirectional(BaseTransform):
                 h, w = results.get('input_size', results['img_shape'])
 
                 # Flip image
-                results['img'] = imflip(results['img'], direction=direction)
+                if isinstance(results['img'], list):
+                    results['img'] = [
+                        imflip(img, direction=direction)
+                        for img in results['img']
+                    ]
+                else:
+                   results['img'] = imflip(results['img'], direction=direction)
+
+                if 'img_mask' in results:
+                    results['img_mask'] = imflip(results['img_mask'], direction=direction)
 
                 # Flip bboxes
                 if results.get('bbox', None) is not None:
