@@ -129,6 +129,9 @@ def parse_pose_metainfo(metainfo: dict):
         lower_body_ids=[],
         flip_indices=[],
         flip_pairs=[],
+        flip_ud_indices=[],
+        flip_ud_pairs=[],
+        rot90_indices=[],
         keypoint_colors=[],
         num_skeleton_links=None,
         skeleton_links=[],
@@ -163,6 +166,21 @@ def parse_pose_metainfo(metainfo: dict):
             if pair not in parsed['flip_pairs']:
                 parsed['flip_pairs'].append(pair)
 
+        swap_ud_kpt = kpt.get('swap_ud', '')
+        if swap_ud_kpt == kpt_name or swap_ud_kpt == '':
+            parsed['flip_ud_indices'].append(kpt_name)
+        else:
+            parsed['flip_ud_indices'].append(swap_ud_kpt)
+            pair = (swap_ud_kpt, kpt_name)
+            if pair not in parsed['flip_ud_pairs']:
+                parsed['flip_ud_pairs'].append(pair)
+
+        rot90_kpt = kpt.get('rot90', '')
+        if rot90_kpt == kpt_name or rot90_kpt == '':
+            parsed['rot90_indices'].append(kpt_name)
+        else:
+            parsed['rot90_indices'].append(rot90_kpt)
+
     # parse skeleton information
     parsed['num_skeleton_links'] = len(metainfo['skeleton_info'])
     for _, sk in metainfo['skeleton_info'].items():
@@ -191,8 +209,14 @@ def parse_pose_metainfo(metainfo: dict):
         parsed['flip_pairs'], mapping=parsed['keypoint_name2id'])
     parsed['flip_indices'] = _map(
         parsed['flip_indices'], mapping=parsed['keypoint_name2id'])
+    parsed['flip_ud_pairs'] = _map(
+        parsed['flip_ud_pairs'], mapping=parsed['keypoint_name2id'])
+    parsed['flip_ud_indices'] = _map(
+        parsed['flip_ud_indices'], mapping=parsed['keypoint_name2id'])
     parsed['skeleton_links'] = _map(
         parsed['skeleton_links'], mapping=parsed['keypoint_name2id'])
+    parsed['rot90_indices'] = _map(
+        parsed['rot90_indices'], mapping=parsed['keypoint_name2id'])
 
     parsed['keypoint_colors'] = np.array(
         parsed['keypoint_colors'], dtype=np.uint8)

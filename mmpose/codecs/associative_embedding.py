@@ -202,6 +202,15 @@ class AssociativeEmbedding(BaseKeypointCodec):
     .. _`UDP (CVPR 2020)`: https://arxiv.org/abs/1911.07524
     """
 
+    field_mapping_table = dict(
+        heatmaps='heatmaps',
+        heatmap_mask='heatmap_mask',
+    )
+    label_mapping_table = dict(
+        keypoint_indices='keypoint_indices',
+        keypoint_weights='keypoint_weights',
+    )
+
     def __init__(
         self,
         input_size: Tuple[int, int],

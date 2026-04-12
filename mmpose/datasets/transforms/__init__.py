@@ -5,10 +5,11 @@ from .bottomup_transforms import (BottomupGetHeatmapMask, BottomupRandomAffine,
 from .common_transforms import (Albumentation, FilterAnnotations,
                                 GenerateTarget, GetBBoxCenterScale,
                                 PhotometricDistortion, RandomBBoxTransform,
-                                RandomFlip, RandomHalfBody, YOLOXHSVRandomAug)
+                                RandomFlip, RandomHalfBody, YOLOXHSVRandomAug, RandomFlipBidirectional, RandomRot90)
 from .converting import KeypointConverter, SingleHandConverter
 from .formatting import PackPoseInputs
 from .hand_transforms import HandRandomFlip
+from .visualise_augmented_images import DebugVisualizeAugmented
 from .loading import LoadImage
 from .mix_img_transforms import Mosaic, YOLOXMixUp
 from .pose3d_transforms import RandomFlipAroundRoot
@@ -16,6 +17,7 @@ from .topdown_transforms import TopdownAffine
 
 __all__ = [
     'GetBBoxCenterScale', 'RandomBBoxTransform', 'RandomFlip',
+    'RandomFlipBidirectional', 'RandomRot90', 'DebugVisualizeAugmented',
     'RandomHalfBody', 'TopdownAffine', 'Albumentation',
     'PhotometricDistortion', 'PackPoseInputs', 'LoadImage',
     'BottomupGetHeatmapMask', 'BottomupRandomAffine', 'BottomupResize',

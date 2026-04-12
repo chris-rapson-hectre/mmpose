@@ -10,6 +10,7 @@ from mmengine.hooks import Hook
 from mmengine.runner import Runner
 from mmengine.visualization import Visualizer
 
+from mmpose.datasets import DebugVisualizeAugmented
 from mmpose.registry import HOOKS
 from mmpose.structures import PoseDataSample, merge_data_samples
 
@@ -166,3 +167,43 @@ class PoseVisualizationHook(Hook):
                 kpt_thr=self.kpt_thr,
                 out_file=out_file,
                 step=self._test_index)
+
+
+@HOOKS.register_module()
+class DebugAugmentedSetupHook(Hook):
+    """Wires DebugVisualizeAugmented's output directory to the runner's
+    work_dir/timestamp/debug_augmented/ folder.
+
+    This hook runs in before_run(), which is called after the dataloader is
+    built but before DataLoader workers are spawned. The directory is
+    communicated in two complementary ways:
+
+    1. Via os.environ['MMPOSE_DEBUG_AUG_DIR'] — inherited by forked/spawned
+       worker processes (works on both Linux and macOS).
+    2. By directly setting _configured_out_dir on any DebugVisualizeAugmented
+       found in the train pipeline — takes effect immediately for num_workers=0.
+    """
+
+    priority = 'VERY_HIGH'
+
+    def before_run(self, runner) -> None:
+        out_dir = os.path.join(runner.work_dir, runner.timestamp, 'debug_augmented')
+
+        # 1. Env var: inherited by worker processes spawned later
+        os.environ['MMPOSE_DEBUG_AUG_DIR'] = out_dir
+
+        # 2. Direct update: effective for num_workers=0
+        try:
+            pipeline = runner.train_dataloader.dataset.pipeline
+            for transform in pipeline.transforms:
+                if isinstance(transform, DebugVisualizeAugmented):
+                    transform._configured_out_dir = out_dir
+                    transform._resolved_out_dir = None  # force re-resolution
+                    os.makedirs(out_dir, exist_ok=True)
+                    break
+        except AttributeError:
+            # dataloader may not have a .pipeline in all configurations
+            runner.logger.debug(
+                'Could not access train pipeline transform configuration. '
+                'Rely on env var to set out_dir for the DebugVisualizeAugmented transform.'
+            )

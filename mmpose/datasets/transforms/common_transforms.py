@@ -7,6 +7,7 @@ import cv2
 import mmcv
 import mmengine
 import numpy as np
+from mmcv import BaseTransform, imflip
 from mmcv.image import imflip
 from mmcv.transforms import BaseTransform
 from mmcv.transforms.utils import avoid_cache_randomness, cache_randomness
@@ -16,6 +17,7 @@ from scipy.stats import truncnorm
 
 from mmpose.codecs import *  # noqa: F401, F403
 from mmpose.registry import KEYPOINT_CODECS, TRANSFORMS
+from mmpose.structures import flip_bbox, flip_keypoints
 from mmpose.structures.bbox import bbox_xyxy2cs, flip_bbox
 from mmpose.structures.keypoint import flip_keypoints
 from mmpose.utils.typing import MultiConfig
@@ -1256,3 +1258,229 @@ class FilterAnnotations(BaseTransform):
                 f'by_area={self.by_area}, '
                 f'by_kpt={self.by_kpt}, '
                 f'keep_empty={self.keep_empty})')
+
+
+@TRANSFORMS.register_module()
+class RandomFlipBidirectional(BaseTransform):
+    """Randomly flip image, bbox and keypoints with direction-specific
+    swap indices.
+
+    Args:
+        prob (float): Probability of each flip being applied independently.
+        directions (list[str]): Flip directions, e.g. ['horizontal', 'vertical'].
+        flip_indices_map (dict): Mapping from direction to the key in results
+            that holds the swap indices. E.g.:
+            {'horizontal': 'flip_indices', 'vertical': 'flip_ud_indices'}
+    """
+
+    def __init__(self, prob=0.5,
+                 directions=('horizontal', 'vertical'),
+                 flip_indices_map=None):
+        if not 0 <= prob <= 1:
+            raise ValueError(f'prob must be in [0, 1], got {prob}')
+        if not is_list_of(list(directions), str):
+            raise TypeError('directions must be a sequence of strings')
+
+        self.prob = prob
+        self.directions = directions
+        self.flip_indices_map = flip_indices_map or {
+            'horizontal': 'flip_indices',
+            'vertical': 'flip_ud_indices',
+        }
+        unsupported = set(self.directions) - set(self.flip_indices_map)
+        if unsupported:
+            raise ValueError(
+                f'No flip index mapping configured for {sorted(unsupported)}')
+
+    def transform(self, results: dict) -> dict:
+        results['flip_direction'] = []
+        results['flip'] = False
+        for direction in self.directions:
+            if np.random.rand() < self.prob:
+                h, w = results.get('input_size', results['img_shape'])
+
+                # Flip image
+                if isinstance(results['img'], list):
+                    results['img'] = [
+                        imflip(img, direction=direction)
+                        for img in results['img']
+                    ]
+                else:
+                   results['img'] = imflip(results['img'], direction=direction)
+
+                if 'img_mask' in results:
+                    results['img_mask'] = imflip(results['img_mask'], direction=direction)
+
+                # Flip bboxes
+                if results.get('bbox', None) is not None:
+                    results['bbox'] = flip_bbox(
+                        results['bbox'], image_size=(w, h),
+                        bbox_format='xyxy', direction=direction)
+                if results.get('bbox_center', None) is not None:
+                    results['bbox_center'] = flip_bbox(
+                        results['bbox_center'], image_size=(w, h),
+                        bbox_format='center', direction=direction)
+
+                # Flip keypoints with direction-specific indices
+                if results.get('keypoints', None) is not None:
+                    idx_key = self.flip_indices_map[direction]
+                    keypoints, keypoints_visible = flip_keypoints(
+                        results['keypoints'],
+                        results.get('keypoints_visible', None),
+                        image_size=(w, h),
+                        flip_indices=results[idx_key],
+                        direction=direction)
+                    results['keypoints'] = keypoints
+                    results['keypoints_visible'] = keypoints_visible
+
+                results['flip'] = True
+                results['flip_direction'].append(direction)
+        return results
+
+
+@TRANSFORMS.register_module()
+class RandomRot90(BaseTransform):
+    """Randomly rotate image, bboxes, and keypoints by 90° increments.
+
+    Rotation is counter-clockwise (consistent with np.rot90).
+    Keypoint indices are swapped using ``rot90_indices`` from dataset metainfo,
+    applied N times for an N×90° rotation.
+
+    Required Keys:
+
+        - img
+        - img_shape
+        - rot90_indices
+        - keypoints (optional)
+        - keypoints_visible (optional)
+        - bbox (optional)
+        - bbox_center (optional)
+
+    Modified Keys:
+
+        - img
+        - img_shape
+        - keypoints (optional)
+        - keypoints_visible (optional)
+        - bbox (optional)
+        - bbox_center (optional)
+
+    Args:
+        prob (float): Probability that any rotation (k>0) is applied.
+            When triggered, k is chosen uniformly from {1, 2, 3}.
+            Defaults to 0.75.
+    """
+
+    def __init__(self, prob: float = 0.75) -> None:
+        super().__init__()
+        assert 0 <= prob <= 1
+        self.prob = prob
+
+    @cache_randomness
+    def _get_rot_k(self) -> int:
+        if np.random.rand() < self.prob:
+            return np.random.choice([1, 2, 3])
+        return 0
+
+    def transform(self, results: dict) -> dict:
+        k = self._get_rot_k()
+        if k == 0:
+            return results
+
+        h, w = results['img_shape'][:2]
+
+        # --- rotate image ---
+        
+        if isinstance(results['img'], list):
+            results['img'] = [np.ascontiguousarray(np.rot90(img, k=k)) for img in results['img']]
+        else:
+            results['img'] = np.ascontiguousarray(np.rot90(results['img'], k=k))
+        
+        if 'img_mask' in results:
+            if isinstance(results['img_mask'], list):
+                results['img_mask'] = [np.ascontiguousarray(np.rot90(mask, k=k)) for mask in results['img_mask']]
+        else:
+            results['img_mask'] = np.ascontiguousarray(np.rot90(results['img_mask'], k=k))
+        if k % 2 == 1:
+            results['img_shape'] = (w, h)
+        # else shape unchanged
+
+        # --- rotate keypoints ---
+        if results.get('keypoints', None) is not None:
+            kpts = results['keypoints'].copy()
+
+            # Coordinate transform (CCW rotation by k*90°)
+            #   k=1: (x, y) -> (y,     W-1-x)   new dims: (W, H)
+            #   k=2: (x, y) -> (W-1-x, H-1-y)   same dims: (H, W)
+            #   k=3: (x, y) -> (H-1-y, x)        new dims: (W, H)
+            x, y = kpts[..., 0].copy(), kpts[..., 1].copy()
+            if k == 1:
+                kpts[..., 0] = y
+                kpts[..., 1] = w - 1 - x
+            elif k == 2:
+                kpts[..., 0] = w - 1 - x
+                kpts[..., 1] = h - 1 - y
+            elif k == 3:
+                kpts[..., 0] = h - 1 - y
+                kpts[..., 1] = x
+
+            # Swap keypoint identities by composing rot90_indices k times
+            rot90_indices = results['rot90_indices']
+            composed = list(range(kpts.shape[-2]))
+            for _ in range(k):
+                composed = [rot90_indices[i] for i in composed]
+
+            kpts = kpts[..., composed, :]
+            results['keypoints'] = kpts
+
+            if results.get('keypoints_visible', None) is not None:
+                vis = results['keypoints_visible']
+                if vis.ndim == kpts.ndim - 1:
+                    results['keypoints_visible'] = vis[..., composed]
+                else:
+                    results['keypoints_visible'] = vis[..., composed, :]
+
+        # --- rotate bboxes (xyxy format) ---
+        if results.get('bbox', None) is not None:
+            bboxes = results['bbox'].copy()  # (N, 4) as x1,y1,x2,y2
+            x1, y1 = bboxes[..., 0].copy(), bboxes[..., 1].copy()
+            x2, y2 = bboxes[..., 2].copy(), bboxes[..., 3].copy()
+            if k == 1:
+                bboxes[..., 0] = y1
+                bboxes[..., 1] = w - 1 - x2
+                bboxes[..., 2] = y2
+                bboxes[..., 3] = w - 1 - x1
+            elif k == 2:
+                bboxes[..., 0] = w - 1 - x2
+                bboxes[..., 1] = h - 1 - y2
+                bboxes[..., 2] = w - 1 - x1
+                bboxes[..., 3] = h - 1 - y1
+            elif k == 3:
+                bboxes[..., 0] = h - 1 - y2
+                bboxes[..., 1] = x1
+                bboxes[..., 2] = h - 1 - y1
+                bboxes[..., 3] = x2
+            results['bbox'] = bboxes
+
+        if results.get('bbox_center', None) is not None:
+            center = results['bbox_center'].copy()  # (N, 2)
+            cx, cy = center[..., 0].copy(), center[..., 1].copy()
+            if k == 1:
+                center[..., 0] = cy
+                center[..., 1] = w - 1 - cx
+            elif k == 2:
+                center[..., 0] = w - 1 - cx
+                center[..., 1] = h - 1 - cy
+            elif k == 3:
+                center[..., 0] = h - 1 - cy
+                center[..., 1] = cx
+            results['bbox_center'] = center
+
+        if k % 2 == 1 and results.get('bbox_scale', None) is not None:
+            # swap w and h if rotated by 90 or 270 degrees
+            results['bbox_scale'] = results['bbox_scale'][..., [1, 0]]
+
+        return results
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}(prob={self.prob})'

@@ -158,7 +158,7 @@ def refine_keypoints_dark_udp(keypoints: np.ndarray, heatmaps: np.ndarray,
         dxy = 0.5 * (ix1y1 - ix1 - iy1 + i_ + i_ - ix1_ - iy1_ + ix1_y1_)
         hessian = np.concatenate([dxx, dxy, dxy, dyy], axis=1)
         hessian = hessian.reshape(K, 2, 2)
-        hessian = np.linalg.inv(hessian + np.finfo(np.float32).eps * np.eye(2))
+        hessian = np.linalg.pinv(hessian + np.finfo(np.float32).eps * np.eye(2))
         keypoints[n] -= np.einsum('imn,ink->imk', hessian,
                                   derivative).squeeze()
 
