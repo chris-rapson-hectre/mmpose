@@ -56,7 +56,8 @@ class TestUnfreezeBackboneHook(TestCase):
             model=SimpleNamespace(module=wrapped_model), logger=Mock(), epoch=2
         )
 
-        hook.before_run(SimpleNamespace(model=wrapped_model, logger=Mock()))
+        hook.before_run(SimpleNamespace(model=wrapped_model, logger=Mock(), epoch=0))
+        assert wrapped_model.backbone.frozen_stages == 4
         hook.before_train_epoch(runner)
 
         assert wrapped_model.backbone.frozen_stages == -1
