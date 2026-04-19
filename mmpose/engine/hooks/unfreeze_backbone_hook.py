@@ -11,9 +11,11 @@ class UnfreezeBackboneHook(Hook):
         self.backbone_stages = backbone_stages
 
     def before_run(self, runner: Runner):
+        assert hasattr(runner, 'epoch'), 'Runner must have an epoch attribute'
         model = runner.model
-        if hasattr(model, 'module'):
+        if hasattr(model, 'module'):  # Handle DistributedDataParallel wrapper
             model = model.module
+        assert hasattr(model, 'backbone'), 'Model must have a backbone attribute'
         if runner.epoch >= self.unfreeze_epoch:
             for param in model.backbone.parameters():
                 param.requires_grad = True
@@ -28,11 +30,10 @@ class UnfreezeBackboneHook(Hook):
         model = runner.model
         if hasattr(model, 'module'):  # Handle DistributedDataParallel wrapper
             model = model.module
-            
-        # Check if we reached the target epoch    
+
+        # Check if we reached the target epoch
         if runner.epoch >= self.unfreeze_epoch and model.backbone.frozen_stages != -1:
             runner.logger.info(f'Unfreezing backbone at epoch {runner.epoch}')
-
 
             # Set all backbone parameters to require gradients
             for param in model.backbone.parameters():

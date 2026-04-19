@@ -1399,8 +1399,8 @@ class RandomRot90(BaseTransform):
         if 'img_mask' in results:
             if isinstance(results['img_mask'], list):
                 results['img_mask'] = [np.ascontiguousarray(np.rot90(mask, k=k)) for mask in results['img_mask']]
-        else:
-            results['img_mask'] = np.ascontiguousarray(np.rot90(results['img_mask'], k=k))
+            else:
+                results['img_mask'] = np.ascontiguousarray(np.rot90(results['img_mask'], k=k))
         if k % 2 == 1:
             results['img_shape'] = (w, h)
         # else shape unchanged
