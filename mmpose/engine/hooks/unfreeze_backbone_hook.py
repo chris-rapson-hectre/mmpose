@@ -25,12 +25,14 @@ class UnfreezeBackboneHook(Hook):
             runner.logger.info('Backbone frozen for initial training phase')
 
     def before_train_epoch(self, runner: Runner):
-        # Check if we reached the target epoch
         model = runner.model
+        if hasattr(model, 'module'):  # Handle DistributedDataParallel wrapper
+            model = model.module
+            
+        # Check if we reached the target epoch    
         if runner.epoch >= self.unfreeze_epoch and model.backbone.frozen_stages != -1:
             runner.logger.info(f'Unfreezing backbone at epoch {runner.epoch}')
-            if hasattr(model, 'module'):  # Handle DistributedDataParallel wrapper
-                model = model.module
+
 
             # Set all backbone parameters to require gradients
             for param in model.backbone.parameters():
