@@ -122,6 +122,7 @@ class TestDebugAugmentedSetupHook(TestCase):
                 work_dir=temp_dir,
                 timestamp="20260330_120000",
                 train_dataloader=SimpleNamespace(dataset=SimpleNamespace()),
+                logger=MagicMock()
             )
 
             hook.before_run(runner)
