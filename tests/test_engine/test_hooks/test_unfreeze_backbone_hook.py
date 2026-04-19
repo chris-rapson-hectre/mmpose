@@ -33,7 +33,7 @@ class TestUnfreezeBackboneHook(TestCase):
         hook = UnfreezeBackboneHook(unfreeze_epoch=3)
 
         model = SimpleNamespace(backbone=DummyBackbone())
-        runner = SimpleNamespace(model=model, logger=Mock())
+        runner = SimpleNamespace(model=model, logger=Mock(), epoch=0)
 
         # confirm that model is not frozen until `before_run` is called
         assert model.backbone.frozen_stages == -1
